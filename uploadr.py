@@ -967,11 +967,11 @@ if __name__ == "__main__":
         if ( not flick.checkToken() ):
             flick.authenticate()
         #flick.displaySets()
-        flick.removeUselessSetsTable()
-        flick.getFlickrSets()
-        flick.convertRawFiles()
+        #flick.removeUselessSetsTable()
+        #flick.getFlickrSets()
+        #flick.convertRawFiles()
         flick.upload()
-        flick.removeDeletedMedia()
-        flick.createSets()
-        flick.addTagsToUploadedPhotos()
+        #flick.removeDeletedMedia()
+        #flick.createSets()
+        #flick.addTagsToUploadedPhotos()
 print("--------- End time: " + time.strftime("%c") + " ---------");
