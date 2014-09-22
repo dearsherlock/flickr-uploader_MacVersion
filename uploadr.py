@@ -74,6 +74,7 @@ import pprint
 import json
 from PIL import Image
 from xml.dom.minidom import parse
+from xml.dom import minidom
 import hashlib
 import fcntl
 import errno
@@ -102,7 +103,9 @@ FILE_MAX_SIZE = eval(config.get('Config','FILE_MAX_SIZE'))
 MANAGE_CHANGES = eval(config.get('Config','MANAGE_CHANGES'))
 RAW_TOOL_PATH = eval(config.get('Config','RAW_TOOL_PATH'))
 CONVERT_RAW_FILES = eval(config.get('Config','CONVERT_RAW_FILES'))
-
+API_KEY=FLICKR[ "api_key" ]
+AUTH = False
+debug = False
 #print FILES_DIR
 #print FLICKR
 #print SLEEP_TIME
@@ -119,6 +122,7 @@ CONVERT_RAW_FILES = eval(config.get('Config','CONVERT_RAW_FILES'))
 ##
 ##  You shouldn't need to modify anything below here
 ##
+class FlickrError(Exception): pass
 
 class APIConstants:
     """ APIConstants class
@@ -384,13 +388,18 @@ class Uploadr:
 
         #print date_file_list  # test
         date_file_list.sort()
-        print(type(date_file_list[0]).__name__)
-        print(date_file_list[0][1])
+        # print(type(date_file_list[0]).__name__)
+        #print(date_file_list[0][1])
         success = self.uploadFileNoDB( date_file_list[0][1] )
         if args.drip_feed and success:
             print("Upload Single File Sucess at photoid:"+success)
+        self.addToClipBoard(success)
         print("*****Completed upload By SingleFile*****")
 
+    def addToClipBoard( self, text ):
+        command = 'echo %s | tr -d "\n" | pbcopy' % text
+        # print(command)
+        os.system(command)
 
     def upload( self ):
         """ upload
@@ -399,12 +408,12 @@ class Uploadr:
         print("*****Uploading files*****")
 
         allMedia = self.grabNewFiles()
-        print("allMedia type:" + type(allMedia).__name__)
+        #print("allMedia type:" + type(allMedia).__name__)
         print("Found " + str(len(allMedia)) + " files")
         coun = 0;
         for i, file in enumerate( allMedia ):
-            print("file type:" + type(file).__name__)
-            print("file value:" + file)
+            #print("file type:" + type(file).__name__)
+            #print("file value:" + file)
             success = self.uploadFile( file )
             if args.drip_feed and success and i != len( allMedia )-1:
                 print("Waiting " + str(DRIP_TIME) + " seconds before next upload")
@@ -482,6 +491,122 @@ class Uploadr:
                         files.append( os.path.normpath( dirpath + "/" + f ).replace("'", "\'") )
         files.sort()
         return files
+   
+    def getOrifinalFlickrImageURL(self, photoid ,size='Original', urlType='source'):
+        """Retrieves a url for the photo.  (flickr.photos.getSizes)
+            urlType - 'url' or 'source'
+            'url' - flickr page of photo
+            'source' - image file
+            """
+        method = 'flickr.photos.getSizes'
+        data = self._doget(method, photo_id=photoid, format="rest")
+        print("_doget completed")
+        print(type(data).__name__)
+        print(data)
+        
+        for psize in data.rsp.sizes.size:
+            if psize.label == size:
+                return getattr(psize, urlType)
+        raise FlickrError, "No URL found"
+
+    def _doget(self, method, auth=True, **params):
+        #uncomment to check you aren't killing the flickr server
+        #print "***** do get %s" % method
+        print("prepare url")
+        
+        params = self._prepare_params(params)
+        url = '%s%s/?api_key=%s&method=%s&%s%s'% \
+            ('https://flickr.com', '/services/rest', API_KEY, method, urllib.urlencode(params),
+             self._get_auth_url_suffix(method, auth, params))
+        print( "url="+url)
+        #another useful debug print statement
+        if debug:
+            print "_doget", url
+
+        return self._get_data(minidom.parse(urllib2.urlopen(url)))
+
+    def _get_data(self ,xml):
+        """Given a bunch of XML back from Flickr, we turn it into a data structure
+            we can deal with (after checking for errors)."""
+
+        # original method,
+        #   data = unmarshal(xml)
+        #if not data.rsp.stat == 'ok':
+        data = self.unmarshal(xml)
+        if not data.rsp.stat == 'ok':
+            msg = "ERROR [%s]: %s" % (data.rsp.err.code, data.rsp.err.msg)
+            raise FlickrError, msg
+        return data
+
+#       if ( not xml == "" and xml.documentElement.attributes['stat'].value ==          "ok" ):
+#           msg=xml
+#       else :
+#           msg =str( xml.toxml() )
+#           raise FlickrError, msg
+#       return msg
+
+    def _get_auth_url_suffix(self,method, auth, params):
+        """Figure out whether we want to authorize, and if so, construct a suitable
+            URL suffix to pass to the Flickr API."""
+        authentication = False
+    
+        # auth may be passed in via the API, AUTH may be set globally (in the same
+        # manner as API_KEY, etc). We do a few more checks than may seem necessary
+        # because we allow the 'auth' parameter to actually contain the
+        # authentication token, not just True/False.
+        if auth or AUTH:
+            token = self.userToken()
+            authentication = True
+        elif auth != False:
+            token = auth
+            authentication = True
+        elif AUTH != False:
+            token = AUTH
+            authentication = True
+    
+        # If we're not authenticating, no suffix is required.
+        if not authentication:
+            return ''
+    
+        full_params = params
+        full_params['method'] = method
+
+        return '&auth_token=%s&api_sig=%s' % (token, self._get_api_sig(full_params))
+
+    def userToken( self ):
+        return self.token
+
+    def _get_api_sig(self,params):
+        """Generate API signature."""
+        token = self.userToken()
+        parameters = ['api_key', 'auth_token']
+        for item in params.items():
+            parameters.append(item[0])
+        parameters.sort()
+        api_string =[]
+        api_string.append(FLICKR[ "secret" ])
+        for item in parameters:
+            for chocolate in params.items():
+                if item == chocolate[0]:
+                    api_string.append(item)
+                    api_string.append(str(chocolate[1]))
+            if item == 'api_key':
+                api_string.append('api_key')
+                api_string.append(API_KEY)
+            if item == 'auth_token':
+                api_string.append('auth_token')
+                api_string.append(token)
+
+        api_signature = hashlib.md5(''.join(api_string)).hexdigest()
+    
+        return api_signature
+
+    def _prepare_params(self,params):
+        """Convert lists to strings with ',' between items."""
+        for (key, value) in params.items():
+            if isinstance(value, list):
+                params[key] = ','.join([item for item in value])
+        return params
 
     def uploadFileNoDB( self, file ):
         """ uploadFileNoDB
@@ -519,7 +644,8 @@ class Uploadr:
                 print("Successfully uploaded the file: " + file)
                 
                 # Add to set
-                success = xmlData
+                success =self.getOrifinalFlickrImageURL( xmlData)
+                    
             else :
                 print("A problem occurred while attempting to upload the file: " + file)
                 try:
@@ -883,7 +1009,42 @@ class Uploadr:
                     break
                 m.update(data)
             return m.hexdigest()
+    #unmarshal taken and modified from pyamazon.py
+    #makes the xml easy to work with
+    class Bag: pass
 
+    def unmarshal(self, element):
+        rc = self.Bag()
+        if isinstance(element, minidom.Element):
+            for key in element.attributes.keys():
+                setattr(rc, key, element.attributes[key].value)
+        childElements = [e for e in element.childNodes \
+                 if isinstance(e, minidom.Element)]
+        if childElements:
+            for child in childElements:
+                key = child.tagName
+                if hasattr(rc, key):
+                    if type(getattr(rc, key)) <> type([]):
+                        setattr(rc, key, [getattr(rc, key)])
+                    setattr(rc, key, getattr(rc, key) + [self.unmarshal(child)])
+                elif isinstance(child, minidom.Element) and \
+                    (child.tagName == 'Details'):
+                    # make the first Details element a key
+                    setattr(rc,key,[self.unmarshal(child)])
+                    #dbg: because otherwise 'hasattr' only tests
+                    #dbg: on the second occurence: if there's a
+                    #dbg: single return to a query, it's not a
+                    #dbg: list. This module should always
+                    #dbg: return a list of Details objects.
+                else:
+                    setattr(rc, key, self.unmarshal(child))
+        else:
+            #jec: we'll have the main part of the element stored in .text
+            #jec: will break if tag <text> is also present
+            text = "".join([e.data for e in element.childNodes \
+                    if isinstance(e, minidom.Text)])
+            setattr(rc, 'text', text)
+        return rc
     def addTagsToUploadedPhotos ( self ) :
         print('*****Adding tags to existing photos*****')
 
