@@ -388,6 +388,8 @@ class Uploadr:
 
         #print date_file_list  # test
         date_file_list.sort()
+        date_file_list.sort(reverse=True)
+        
         # print(type(date_file_list[0]).__name__)
         #print(date_file_list[0][1])
         success = self.uploadFileNoDB( date_file_list[0][1] )
