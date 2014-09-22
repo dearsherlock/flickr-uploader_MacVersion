@@ -394,6 +394,7 @@ class Uploadr:
         if args.drip_feed and success:
             print("Upload Single File Sucess at photoid:"+success)
         self.addToClipBoard(success)
+        self.notify(title='Python Flickr Tool',subtitle='by sherlock',message='Flickr Url Get!')
         print("*****Completed upload By SingleFile*****")
 
     def addToClipBoard( self, text ):
@@ -424,7 +425,14 @@ class Uploadr:
         if (coun%100 > 0):
             print("   " + str(coun) + " files processed (uploaded or md5ed)")
         print("*****Completed uploading files*****")
-
+    
+    # The notifier function
+    def notify(self ,title, subtitle, message):
+        t = '-title {!r}'.format(title)
+        s = '-subtitle {!r}'.format(subtitle)
+        m = '-message {!r}'.format(message)
+        os.system('terminal-notifier {}'.format(' '.join([m, t, s])))
+    
     def convertRawFiles( self ):
         """ convertRawFiles
         """
@@ -1165,13 +1173,13 @@ class Uploadr:
 print("--------- Start time: " + time.strftime("%c") + " ---------");
 if __name__ == "__main__":
     # Ensure that only once instance of this script is running
-    f = open (LOCK_PATH, 'w')
-    try: fcntl.lockf (f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except IOError, e:
-        if e.errno == errno.EAGAIN:
-            sys.stderr.write('[%s] Script already running.\n' % time.strftime ('%c') )
-            sys.exit(-1)
-        raise
+    #f = open (LOCK_PATH, 'w')
+    #try: fcntl.lockf (f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    #except IOError, e:
+    #    if e.errno == errno.EAGAIN:
+    #        sys.stderr.write('[%s] Script already running.\n' % time.strftime ('%c') )
+    #        sys.exit(-1)
+    #    raise
     parser = argparse.ArgumentParser(description='Upload files to Flickr.')
     parser.add_argument('-d', '--daemon', action='store_true',
         help='Run forever as a daemon')
