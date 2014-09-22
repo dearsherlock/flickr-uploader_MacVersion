@@ -80,7 +80,7 @@ import errno
 import subprocess
 from sys import stdout
 import itertools
-
+import glob, time
 ##
 ## Read Config from config.ini file
 ##
@@ -366,6 +366,32 @@ class Uploadr:
                     success = self.deleteFile(row, cur)
         print("*****Completed deleted files*****")
 
+    def uploadLastModifyImage( self ):
+        """ upload file to automatic upload some file,and retrieve url
+        """
+        print("*****upload By SingleFile*****")
+        date_file_list = []
+        # //for folder in glob.glob(FILES_DIR):
+        # //print "folder =", folder
+        # select the type of file, for instance *.jpg or all files *.*
+        for file in glob.glob(FILES_DIR + '/*.*'):
+            folder, file_name = os.path.split(file[1])
+            stats = os.stat(file)
+           
+            lastmod_date = time.localtime(stats[9])
+            date_file_tuple = lastmod_date, file
+            date_file_list.append(date_file_tuple)
+
+        #print date_file_list  # test
+        date_file_list.sort()
+        print(type(date_file_list[0]).__name__)
+        print(date_file_list[0][1])
+        success = self.uploadFileNoDB( date_file_list[0][1] )
+        if args.drip_feed and success:
+            print("Upload Single File Sucess at photoid:"+success)
+        print("*****Completed upload By SingleFile*****")
+
+
     def upload( self ):
         """ upload
         """
@@ -373,9 +399,12 @@ class Uploadr:
         print("*****Uploading files*****")
 
         allMedia = self.grabNewFiles()
+        print("allMedia type:" + type(allMedia).__name__)
         print("Found " + str(len(allMedia)) + " files")
         coun = 0;
         for i, file in enumerate( allMedia ):
+            print("file type:" + type(file).__name__)
+            print("file value:" + file)
             success = self.uploadFile( file )
             if args.drip_feed and success and i != len( allMedia )-1:
                 print("Waiting " + str(DRIP_TIME) + " seconds before next upload")
@@ -454,6 +483,52 @@ class Uploadr:
         files.sort()
         return files
 
+    def uploadFileNoDB( self, file ):
+        """ uploadFileNoDB
+        """
+        print("Uploading " + file + "...")
+        head, setName = os.path.split(os.path.dirname(file))
+        try:
+            photo = ('photo', file, open(file,'rb').read())
+            if args.title: # Replace
+                FLICKR["title"] = args.title
+            if args.description: # Replace
+                FLICKR["description"] = args.description
+            if args.tags: # Append
+                FLICKR["tags"] += " " + args.tags + " "
+            d = {
+                "auth_token"    : str(self.token),
+                "perms"         : str(self.perms),
+                "title"         : str( FLICKR["title"] ),
+                "description"   : str( FLICKR["description"] ),
+                "tags"          : str( FLICKR["tags"] + "," + setName ),
+                "is_public"     : str( FLICKR["is_public"] ),
+                "is_friend"     : str( FLICKR["is_friend"] ),
+                "is_family"     : str( FLICKR["is_family"] )
+            }
+            sig = self.signCall( d )
+            d[ "api_sig" ] = sig
+            d[ "api_key" ] = FLICKR[ "api_key" ]
+            url = self.build_request(api.upload, d, (photo,))
+            res = parse(urllib2.urlopen( url ))
+            if ( not res == "" and res.documentElement.attributes['stat'].value == "ok" ):
+                xmlTag=res.documentElement.getElementsByTagName("photoid")[0].toxml()
+                xmlData=xmlTag.replace('<photoid>','').replace('</photoid>','')
+                print("response:"+xmlData)
+                #print("PHOTO ID:"+res.documentElement.elements['photoid'].value)
+                print("Successfully uploaded the file: " + file)
+                
+                # Add to set
+                success = xmlData
+            else :
+                print("A problem occurred while attempting to upload the file: " + file)
+                try:
+                    print("Error: " + str( res.toxml() ))
+                except:
+                    print("Error: " + str( res.toxml() ))
+        except:
+            print(str(sys.exc_info()))
+        return success
     def uploadFile( self, file ):
         """ uploadFile
         """
@@ -970,7 +1045,9 @@ if __name__ == "__main__":
         #flick.removeUselessSetsTable()
         #flick.getFlickrSets()
         #flick.convertRawFiles()
-        flick.upload()
+        #flick.upload()
+        flick.uploadLastModifyImage()
+
         #flick.removeDeletedMedia()
         #flick.createSets()
         #flick.addTagsToUploadedPhotos()
