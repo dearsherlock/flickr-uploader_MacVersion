@@ -522,7 +522,7 @@ class Uploadr:
     def _doget(self, method, auth=True, **params):
         #uncomment to check you aren't killing the flickr server
         #print "***** do get %s" % method
-        print("prepare url")
+        #print("prepare url")
         
         params = self._prepare_params(params)
         url = '%s%s/?api_key=%s&method=%s&%s%s'% \
@@ -622,15 +622,18 @@ class Uploadr:
         """ uploadFileNoDB
         """
         print("Uploading " + file + "...")
+       
+        filename=file.split('/')[len(file.split('/'))-1]
+        print("filename="+filename)
         head, setName = os.path.split(os.path.dirname(file))
         try:
             photo = ('photo', file, open(file,'rb').read())
-            if args.title: # Replace
-                FLICKR["title"] = args.title
-            if args.description: # Replace
-                FLICKR["description"] = args.description
-            if args.tags: # Append
-                FLICKR["tags"] += " " + args.tags + " "
+            if filename: # Replace
+                FLICKR["title"] = filename
+            if filename: # Replace
+                FLICKR["description"] = filename
+            if filename: # Replace
+                FLICKR["tags"] += " " + filename + " "
             d = {
                 "auth_token"    : str(self.token),
                 "perms"         : str(self.perms),
