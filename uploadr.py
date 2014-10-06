@@ -407,7 +407,6 @@ class Uploadr:
     def upload( self ):
         """ upload
         """
-
         print("*****Uploading files*****")
 
         allMedia = self.grabNewFiles()
