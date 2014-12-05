@@ -396,7 +396,8 @@ class Uploadr:
         if args.drip_feed and success:
             print("Upload Single File Sucess at photoid:"+success)
         self.addToClipBoard(success)
-        self.notify(title='Python Flickr Tool',subtitle='by sherlock',message='Flickr Url Get!')
+        print(success)
+        self.notify(title='Python Flickr Tool',subtitle='by sherlock',message='Flickr Url Get!',url=success)
         print("*****Completed upload By SingleFile*****")
 
     def addToClipBoard( self, text ):
@@ -428,11 +429,13 @@ class Uploadr:
         print("*****Completed uploading files*****")
     
     # The notifier function
-    def notify(self ,title, subtitle, message):
+    def notify(self ,title, subtitle, message, url):
         t = '-title {!r}'.format(title)
         s = '-subtitle {!r}'.format(subtitle)
         m = '-message {!r}'.format(message)
-        os.system('terminal-notifier {}'.format(' '.join([m, t, s])))
+        o = '-open '+url
+        print('terminal-notifier {}'.format(' '.join([m, t, s, o])))
+        os.system('terminal-notifier {}'.format(' '.join([m, t, s, o])))
     
     def convertRawFiles( self ):
         """ convertRawFiles
@@ -620,7 +623,7 @@ class Uploadr:
     def uploadFileNoDB( self, file ):
         """ uploadFileNoDB
         """
-        print("Uploading " + file + "...")
+        print("Uploading 2" + file + "...")
        
         filename=file.split('/')[len(file.split('/'))-1]
         print("filename="+filename)
